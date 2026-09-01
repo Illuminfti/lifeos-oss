@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifeos.dev/schemas/connector-manifest.v1.json",
+  "title": "LifeOS connector manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "id",
+    "version",
+    "display_name",
+    "source_classes",
+    "capabilities",
+    "auth_modes",
+    "custody",
+    "outbound_actions",
+    "implementation_status"
+  ],
+  "properties": {
+    "protocol": {"const": "lifeos.connector/v1"},
+    "id": {"type": "string", "pattern": "^org\\.lifeos\\.[a-z0-9.-]+$"},
+    "version": {"type": "string", "minLength": 1},
+    "display_name": {"type": "string", "minLength": 1},
+    "source_classes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "capabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "auth_modes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "custody": {"enum": ["local", "third_party"]},
+    "outbound_actions": {"const": false},
+    "implementation_status": {"enum": ["working", "experimental", "scaffold"]},
+    "notes": {"type": "string"}
+  }
+}

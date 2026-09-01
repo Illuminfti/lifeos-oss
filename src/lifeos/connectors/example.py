@@ -1,100 +1,82 @@
+"""Synthetic reference connector for authors and conformance tests."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from hashlib import sha256
-from typing import Any
+from typing import Any, Mapping
 from uuid import uuid4
 
-from lifeos.contracts import CaptureEvent, ConnectorManifest, HealthReport
+from lifeos.connectors.base import BaseConnector, ConnectorContext
+from lifeos.contracts import (
+    Actor,
+    CaptureEvent,
+    ConnectResult,
+    Connection,
+    ConnectorManifest,
+    HealthReport,
+    SyncBatch,
+)
 
 
-class Plugin:
-    """Example fixture connector capture plugin. Outbound send is out of scope."""
+class ExampleConnector(BaseConnector):
+    manifest = ConnectorManifest(
+        id="org.lifeos.example",
+        display_name="Example synthetic connector",
+        source_classes=("message", "person"),
+        capabilities=("backfill", "incremental_sync", "revoke", "purge", "fixtures"),
+        auth_modes=("none",),
+        custody="local",
+        implementation_status="working",
+        notes="Synthetic only. Contains no personal data.",
+    )
 
-    def __init__(self) -> None:
-        self.manifest = ConnectorManifest(
-            id="org.lifeos.example",
-            display_name="Example fixture connector",
-            source_classes=['note'],
-            capabilities=['backfill', 'incremental_sync', 'purge'],
-            auth_modes=['none'],
-            custody="local",
-            outbound_actions=False,
-            notes="Conformance reference. Emits synthetic events only.",
+    def connect(
+        self, request: Mapping[str, Any], context: ConnectorContext
+    ) -> ConnectResult:
+        return ConnectResult(
+            connection_id="con_" + uuid4().hex,
+            settings={"fixture_count": int(request.get("fixture_count", 1))},
+            granted_scopes=("synthetic:read",),
         )
-        self._connected = False
-        self._secret_ref: str | None = None
 
-    def describe(self) -> ConnectorManifest:
-        return self.manifest
-
-    def health(self) -> HealthReport:
-        if not self._connected:
-            return HealthReport(state="disconnected")
-        if self.manifest.id.endswith(".example"):
-            return HealthReport(state="healthy")
-        return HealthReport(
-            state="auth_required",
-            error="credentials not configured; live sync is not faked",
+    def _events(self, connection: Connection, count: int) -> tuple[CaptureEvent, ...]:
+        return tuple(
+            CaptureEvent.create(
+                connector_id=self.manifest.id,
+                connection_id=connection.connection_id,
+                source_record_id=f"fixture-{index}",
+                source_revision="1",
+                source_thread_id="fixture-thread",
+                kind="message.created",
+                occurred_at=f"2026-01-{index + 1:02d}T12:00:00Z",
+                actors=(Actor(provider_ref="fixture:ada", display_name="Ada Example"),),
+                text=f"Synthetic fixture message {index + 1}. No personal data.",
+                metadata={"fixture": True},
+            )
+            for index in range(count)
         )
 
-    def connect(self, request: dict[str, Any]) -> dict[str, Any]:
-        if self.manifest.id.endswith(".example"):
-            self._connected = True
-            return {"ok": True, "connection_id": "con_example", "custody": "local"}
-        secret = (
-            request.get("secret_ref")
-            or request.get("path")
-            or request.get("export_path")
-            or request.get("socket")
+    def backfill(
+        self,
+        connection: Connection,
+        checkpoint: Mapping[str, Any],
+        context: ConnectorContext,
+    ) -> SyncBatch:
+        count = int(connection.settings.get("fixture_count", 1))
+        if checkpoint.get("complete"):
+            return SyncBatch(events=(), checkpoint=dict(checkpoint), complete=True)
+        return SyncBatch(
+            events=self._events(connection, count),
+            checkpoint={"complete": True, "count": count},
         )
-        if not secret:
-            return {
-                "ok": False,
-                "error": "auth_required",
-                "message": "No credentials supplied. Capture plugins do not invent sessions.",
-            }
-        self._connected = True
-        self._secret_ref = str(secret)
-        return {
-            "ok": True,
-            "connection_id": "con_pending",
-            "custody": self.manifest.custody,
-            "live_sync": False,
-            "note": "Credential handle accepted. Live provider client is not claimed until implemented.",
-        }
 
-    def backfill(self, request: dict[str, Any]) -> list[CaptureEvent]:
-        if self.manifest.id.endswith(".example"):
-            return [self._fixture_event()]
-        return []
+    def sync(
+        self,
+        connection: Connection,
+        checkpoint: Mapping[str, Any],
+        context: ConnectorContext,
+    ) -> SyncBatch:
+        return SyncBatch(events=(), checkpoint=dict(checkpoint), complete=True)
 
-    def sync(self, request: dict[str, Any]) -> list[CaptureEvent]:
-        return []
-
-    def revoke(self) -> dict[str, Any]:
-        self._connected = False
-        self._secret_ref = None
-        return {"ok": True, "credentials_deleted": True, "evidence_untouched": True}
-
-    def purge(self) -> dict[str, Any]:
-        return {"ok": True, "raw_deleted": True, "canon_untouched": True}
-
-    def test_fixture(self) -> dict[str, Any]:
-        ev = self._fixture_event()
-        return {"ok": True, "events": 1, "event_id": ev.event_id, "kind": ev.kind}
-
-    def _fixture_event(self) -> CaptureEvent:
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        text = "synthetic fixture; not personal data (example)"
-        return CaptureEvent(
-            event_id="evt_" + uuid4().hex[:12],
-            connector_id=self.manifest.id,
-            source_record_id="fix_1",
-            kind="fixture.created",
-            occurred_at=now,
-            observed_at=now,
-            text=text,
-            content_hash=sha256(text.encode()).hexdigest(),
-            metadata={"connector": "example", "synthetic": True},
-        )
+    def health(
+        self, connection: Connection | None, context: ConnectorContext
+    ) -> HealthReport:
+        return HealthReport(state="healthy" if connection else "disconnected")

@@ -1,0 +1,36 @@
+services:
+  mcp:
+    build: .
+    user: "${LIFEOS_UID:-1000}:${LIFEOS_GID:-1000}"
+    command:
+      - mcp-serve
+      - --transport
+      - streamable-http
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8787"
+    environment:
+      LIFEOS_BRAIN: /data/brain
+    volumes:
+      - ./brain:/data/brain
+    ports:
+      - "127.0.0.1:8787:8787"
+    restart: unless-stopped
+
+  webhooks:
+    build: .
+    user: "${LIFEOS_UID:-1000}:${LIFEOS_GID:-1000}"
+    command:
+      - webhook-serve
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8765"
+    environment:
+      LIFEOS_BRAIN: /data/brain
+    volumes:
+      - ./brain:/data/brain
+    ports:
+      - "127.0.0.1:8765:8765"
+    restart: unless-stopped

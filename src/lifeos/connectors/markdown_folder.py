@@ -1,100 +1,125 @@
+"""First-party Markdown folder connector."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from hashlib import sha256
-from typing import Any
+from pathlib import Path
+from typing import Any, Mapping
 from uuid import uuid4
 
-from lifeos.contracts import CaptureEvent, ConnectorManifest, HealthReport
+from lifeos.connectors.base import BaseConnector, ConnectorContext
+from lifeos.contracts import CaptureEvent, ConnectResult, Connection, ConnectorManifest, HealthReport, SyncBatch
+from lifeos.errors import ConfigurationError
 
 
-class Plugin:
-    """Markdown folder capture plugin. Outbound send is out of scope."""
+def _stamp(path: Path) -> str:
+    return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
-    def __init__(self) -> None:
-        self.manifest = ConnectorManifest(
-            id="org.lifeos.markdown-folder",
-            display_name="Markdown folder",
-            source_classes=['note', 'page'],
-            capabilities=['backfill', 'incremental_sync', 'purge'],
-            auth_modes=['path'],
-            custody="local",
-            outbound_actions=False,
-            notes="User-selected Markdown directory as a source, not as a second canon.",
+
+def _digest(data: bytes) -> str:
+    return "sha256:" + sha256(data).hexdigest()
+
+
+class MarkdownFolderConnector(BaseConnector):
+    manifest = ConnectorManifest(
+        id="org.lifeos.markdown-folder",
+        display_name="Markdown folder",
+        source_classes=("document", "note"),
+        capabilities=("backfill", "incremental_sync", "deletions", "revoke", "purge"),
+        auth_modes=("filesystem_consent",),
+        custody="local",
+        implementation_status="working",
+        notes="Reads only the explicitly selected folder. Never edits source files.",
+    )
+
+    def connect(self, request: Mapping[str, Any], context: ConnectorContext) -> ConnectResult:
+        raw = request.get("path")
+        if not raw:
+            raise ConfigurationError("markdown-folder requires `path`")
+        source = Path(str(raw)).expanduser().resolve()
+        if not source.is_dir():
+            raise ConfigurationError(f"not a directory: {source}")
+        brain = context.config.root.resolve()
+        if source == brain or brain in source.parents or source in brain.parents:
+            raise ConfigurationError("source folder must not contain or live inside the LifeOS brain")
+        return ConnectResult(
+            connection_id="con_" + uuid4().hex,
+            settings={
+                "path": str(source),
+                "glob": str(request.get("glob", "**/*.md")),
+                "max_bytes": int(request.get("max_bytes", 2_000_000)),
+            },
+            granted_scopes=("filesystem:read",),
         )
-        self._connected = False
-        self._secret_ref: str | None = None
 
-    def describe(self) -> ConnectorManifest:
-        return self.manifest
+    def _scan(self, connection: Connection) -> tuple[dict[str, str], dict[str, tuple[bytes, str]]]:
+        root = Path(str(connection.settings["path"]))
+        pattern = str(connection.settings.get("glob", "**/*.md"))
+        max_bytes = int(connection.settings.get("max_bytes", 2_000_000))
+        hashes: dict[str, str] = {}
+        content: dict[str, tuple[bytes, str]] = {}
+        for path in sorted(root.glob(pattern)):
+            if not path.is_file() or any(part.startswith(".") for part in path.relative_to(root).parts):
+                continue
+            if path.stat().st_size > max_bytes:
+                continue
+            data = path.read_bytes()
+            relative = path.relative_to(root).as_posix()
+            digest = _digest(data)
+            hashes[relative] = digest
+            content[relative] = (data, _stamp(path))
+        return hashes, content
 
-    def health(self) -> HealthReport:
-        if not self._connected:
+    def _batch(self, connection: Connection, checkpoint: Mapping[str, Any]) -> SyncBatch:
+        previous = {str(k): str(v) for k, v in dict(checkpoint.get("files", {})).items()}
+        current, content = self._scan(connection)
+        events: list[CaptureEvent] = []
+        for relative, revision in current.items():
+            if previous.get(relative) == revision:
+                continue
+            data, occurred_at = content[relative]
+            events.append(
+                CaptureEvent.create(
+                    connector_id=self.manifest.id,
+                    connection_id=connection.connection_id,
+                    source_record_id=relative,
+                    source_revision=revision,
+                    source_thread_id=relative,
+                    kind="document.updated" if relative in previous else "document.created",
+                    occurred_at=occurred_at,
+                    text=data.decode("utf-8", errors="replace"),
+                    metadata={"relative_path": relative, "source_root_label": Path(str(connection.settings["path"])).name},
+                )
+            )
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        for relative, old_revision in previous.items():
+            if relative in current:
+                continue
+            events.append(
+                CaptureEvent.create(
+                    connector_id=self.manifest.id,
+                    connection_id=connection.connection_id,
+                    source_record_id=relative,
+                    source_revision=f"deleted:{old_revision}",
+                    source_thread_id=relative,
+                    kind="document.deleted",
+                    occurred_at=now,
+                    deleted=True,
+                    metadata={"relative_path": relative},
+                )
+            )
+        return SyncBatch(events=tuple(events), checkpoint={"files": current, "scanned_at": now})
+
+    def backfill(self, connection: Connection, checkpoint: Mapping[str, Any], context: ConnectorContext) -> SyncBatch:
+        return self._batch(connection, checkpoint)
+
+    def sync(self, connection: Connection, checkpoint: Mapping[str, Any], context: ConnectorContext) -> SyncBatch:
+        return self._batch(connection, checkpoint)
+
+    def health(self, connection: Connection | None, context: ConnectorContext) -> HealthReport:
+        if connection is None:
             return HealthReport(state="disconnected")
-        if self.manifest.id.endswith(".example"):
-            return HealthReport(state="healthy")
-        return HealthReport(
-            state="auth_required",
-            error="credentials not configured; live sync is not faked",
-        )
-
-    def connect(self, request: dict[str, Any]) -> dict[str, Any]:
-        if self.manifest.id.endswith(".example"):
-            self._connected = True
-            return {"ok": True, "connection_id": "con_example", "custody": "local"}
-        secret = (
-            request.get("secret_ref")
-            or request.get("path")
-            or request.get("export_path")
-            or request.get("socket")
-        )
-        if not secret:
-            return {
-                "ok": False,
-                "error": "auth_required",
-                "message": "No credentials supplied. Capture plugins do not invent sessions.",
-            }
-        self._connected = True
-        self._secret_ref = str(secret)
-        return {
-            "ok": True,
-            "connection_id": "con_pending",
-            "custody": self.manifest.custody,
-            "live_sync": False,
-            "note": "Credential handle accepted. Live provider client is not claimed until implemented.",
-        }
-
-    def backfill(self, request: dict[str, Any]) -> list[CaptureEvent]:
-        if self.manifest.id.endswith(".example"):
-            return [self._fixture_event()]
-        return []
-
-    def sync(self, request: dict[str, Any]) -> list[CaptureEvent]:
-        return []
-
-    def revoke(self) -> dict[str, Any]:
-        self._connected = False
-        self._secret_ref = None
-        return {"ok": True, "credentials_deleted": True, "evidence_untouched": True}
-
-    def purge(self) -> dict[str, Any]:
-        return {"ok": True, "raw_deleted": True, "canon_untouched": True}
-
-    def test_fixture(self) -> dict[str, Any]:
-        ev = self._fixture_event()
-        return {"ok": True, "events": 1, "event_id": ev.event_id, "kind": ev.kind}
-
-    def _fixture_event(self) -> CaptureEvent:
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        text = "synthetic fixture; not personal data (markdown-folder)"
-        return CaptureEvent(
-            event_id="evt_" + uuid4().hex[:12],
-            connector_id=self.manifest.id,
-            source_record_id="fix_1",
-            kind="fixture.created",
-            occurred_at=now,
-            observed_at=now,
-            text=text,
-            content_hash=sha256(text.encode()).hexdigest(),
-            metadata={"connector": "markdown-folder", "synthetic": True},
-        )
+        source = Path(str(connection.settings.get("path", "")))
+        if not source.is_dir():
+            return HealthReport(state="failed", error="source folder is unavailable")
+        return HealthReport(state="healthy", details={"source_label": source.name})
