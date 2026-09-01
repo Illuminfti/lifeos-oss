@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifeos.dev/schemas/capture-event.v1.json",
+  "title": "LifeOS capture event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "event_id",
+    "connector_id",
+    "connection_id",
+    "source_record_id",
+    "source_revision",
+    "kind",
+    "occurred_at",
+    "observed_at",
+    "actors",
+    "text",
+    "attachments",
+    "deleted",
+    "visibility",
+    "content_hash",
+    "raw",
+    "metadata"
+  ],
+  "properties": {
+    "schema": {"const": "lifeos.capture-event/v1"},
+    "event_id": {"type": "string", "pattern": "^evt_[a-f0-9]{32}$"},
+    "connector_id": {"type": "string", "pattern": "^org\\.lifeos\\."},
+    "connection_id": {"type": "string", "minLength": 1},
+    "source_record_id": {"type": "string", "minLength": 1},
+    "source_revision": {"type": "string", "minLength": 1},
+    "source_thread_id": {"type": ["string", "null"]},
+    "kind": {"type": "string", "minLength": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "actors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider_ref", "display_name", "kind", "metadata"],
+        "properties": {
+          "provider_ref": {"type": "string"},
+          "display_name": {"type": "string"},
+          "kind": {"type": "string"},
+          "metadata": {"type": "object"}
+        }
+      }
+    },
+    "text": {"type": "string"},
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["blob_ref", "mime_type", "size", "filename", "metadata"],
+        "properties": {
+          "blob_ref": {"type": "string"},
+          "mime_type": {"type": "string"},
+          "size": {"type": "integer", "minimum": 0},
+          "filename": {"type": ["string", "null"]},
+          "metadata": {"type": "object"}
+        }
+      }
+    },
+    "deleted": {"type": "boolean"},
+    "visibility": {"type": "string"},
+    "content_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "raw": {"type": "object"},
+    "metadata": {"type": "object"}
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifeos.dev/schemas/proposal.v1.json",
+  "title": "LifeOS proposal v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposal_id",
+    "proposal_type",
+    "status",
+    "connector_id",
+    "connection_id",
+    "target_path",
+    "target_revision",
+    "title",
+    "summary",
+    "evidence_event_ids",
+    "staging_path",
+    "created_at",
+    "reviewed_at",
+    "schema"
+  ],
+  "properties": {
+    "proposal_id": {"type": "string", "pattern": "^prop_[a-f0-9]{32}$"},
+    "proposal_type": {"type": "string"},
+    "status": {"enum": ["awaiting_review", "promoted", "rejected", "stale"]},
+    "connector_id": {"type": "string"},
+    "connection_id": {"type": "string"},
+    "target_path": {"type": "string", "pattern": "^(03-entities|04-work|05-knowledge|06-execution)/"},
+    "target_revision": {"type": "string"},
+    "title": {"type": "string"},
+    "summary": {"type": "string"},
+    "evidence_event_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": true},
+    "staging_path": {"type": "string", "pattern": "^02-staging/"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "reviewed_at": {"type": ["string", "null"], "format": "date-time"},
+    "schema": {"const": "lifeos.proposal/v1"}
+  }
+}

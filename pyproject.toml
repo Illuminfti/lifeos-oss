@@ -1,25 +1,60 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "lifeos"
-version = "0.1.0"
+version = "0.2.0"
 description = "Open-source capture-to-canon world model"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 authors = [{name = "LifeOS contributors"}]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Database :: Database Engines/Servers",
+  "Topic :: Office/Business",
+]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/Illuminfti/lifeos-oss"
+Repository = "https://github.com/Illuminfti/lifeos-oss"
+Issues = "https://github.com/Illuminfti/lifeos-oss/issues"
+
 [project.optional-dependencies]
-dev = ["pytest"]
+mcp = ["mcp>=2,<3"]
+telegram = ["telethon>=1.36,<2"]
+dev = ["pytest>=8", "mcp>=2,<3", "build>=1.2", "jsonschema>=4.23"]
 
 [project.scripts]
 lifeos = "lifeos.cli:main"
 
+[project.entry-points."lifeos.connectors"]
+example = "lifeos.connectors.example:ExampleConnector"
+note = "lifeos.connectors.note:NoteConnector"
+markdown-folder = "lifeos.connectors.markdown_folder:MarkdownFolderConnector"
+whatsapp-export = "lifeos.connectors.whatsapp_export:WhatsAppExportConnector"
+screenpipe = "lifeos.connectors.screenpipe:ScreenpipeConnector"
+telegram = "lifeos.connectors.telegram:TelegramConnector"
+whatsapp-business = "lifeos.connectors.whatsapp_business:WhatsAppBusinessConnector"
+email-gmail = "lifeos.connectors.gmail:GmailConnector"
+email-imap = "lifeos.connectors.imap:ImapConnector"
+composio = "lifeos.connectors.composio:ComposioConnector"
+whoop = "lifeos.connectors.whoop:WhoopConnector"
+x = "lifeos.connectors.x:XConnector"
+google-calendar = "lifeos.connectors.google_calendar:GoogleCalendarConnector"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+lifeos = ["py.typed", "schemas/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-q"

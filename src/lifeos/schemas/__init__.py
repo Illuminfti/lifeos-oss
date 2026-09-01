@@ -1,0 +1,1 @@
+"""Bundled LifeOS JSON schemas."""

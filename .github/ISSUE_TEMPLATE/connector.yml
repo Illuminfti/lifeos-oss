@@ -1,0 +1,28 @@
+name: Connector proposal
+description: Propose or implement a connector plugin
+title: "[connector] "
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider or source
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Official API evidence
+      description: Document auth, backfill, incremental sync, deletion, revoke, purge, and rate limits.
+    validations:
+      required: true
+  - type: checkboxes
+    id: contract
+    attributes:
+      label: Contract
+      options:
+        - label: The plugin emits CaptureEvent v1 and does not fork core.
+          required: true
+        - label: Outbound actions are absent.
+          required: true
+        - label: Fixtures contain no private user data.
+          required: true

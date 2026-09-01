@@ -1,100 +1,106 @@
+"""Composio trigger webhook bridge.
+
+Composio remains one bridge into LifeOS, not the connector architecture. Configure
+selected read-only Composio triggers to POST their events to this connection's
+LifeOS webhook URL.
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from hashlib import sha256
-from typing import Any
+import hmac
+import secrets
+from typing import Any, Mapping
 from uuid import uuid4
 
-from lifeos.contracts import CaptureEvent, ConnectorManifest, HealthReport
+from lifeos.connectors.base import BaseConnector, ConnectorContext
+from lifeos.contracts import Actor, CaptureEvent, ConnectResult, Connection, ConnectorManifest, HealthReport, SyncBatch, content_digest
+from lifeos.errors import ConfigurationError
 
 
-class Plugin:
-    """Composio bridge capture plugin. Outbound send is out of scope."""
+class ComposioConnector(BaseConnector):
+    manifest = ConnectorManifest(
+        id="org.lifeos.composio",
+        display_name="Composio trigger bridge",
+        source_classes=("trigger_event", "message", "calendar_event", "document"),
+        capabilities=("webhooks", "incremental_sync", "revoke", "purge"),
+        auth_modes=("bearer_webhook",),
+        custody="third_party",
+        implementation_status="experimental",
+        notes="Receives selected Composio trigger events. Capture only; action execution is intentionally absent.",
+    )
 
-    def __init__(self) -> None:
-        self.manifest = ConnectorManifest(
-            id="org.lifeos.composio",
-            display_name="Composio bridge",
-            source_classes=['message', 'event'],
-            capabilities=['backfill', 'incremental_sync', 'revoke', 'purge'],
-            auth_modes=['oauth'],
+    def connect(self, request: Mapping[str, Any], context: ConnectorContext) -> ConnectResult:
+        supplied = request.get("secret")
+        if supplied is not None and not isinstance(supplied, Mapping):
+            raise ConfigurationError("Composio secret must be a JSON object")
+        secret_payload = dict(supplied or {})
+        secret_payload.setdefault("ingest_token", secrets.token_urlsafe(32))
+        toolkits = request.get("toolkits", [])
+        if isinstance(toolkits, str):
+            toolkits = [toolkits]
+        return ConnectResult(
+            connection_id="con_" + uuid4().hex,
+            settings={"toolkits": [str(value) for value in toolkits]},
+            granted_scopes=("composio:triggers:receive",),
+            secret_payload=secret_payload,
             custody="third_party",
-            outbound_actions=False,
-            notes="One bridge, not the architecture. Capture path is read-only.",
         )
-        self._connected = False
-        self._secret_ref: str | None = None
 
-    def describe(self) -> ConnectorManifest:
-        return self.manifest
+    def verify_webhook(self, connection: Connection, headers: Mapping[str, str], body: bytes, context: ConnectorContext) -> bool:
+        expected = str(context.secret_for(connection).get("ingest_token", ""))
+        provided = headers.get("authorization", "")
+        if provided.lower().startswith("bearer "):
+            provided = provided[7:]
+        return bool(expected) and hmac.compare_digest(expected, provided)
 
-    def health(self) -> HealthReport:
-        if not self._connected:
+    def backfill(self, connection: Connection, checkpoint: Mapping[str, Any], context: ConnectorContext) -> SyncBatch:
+        return SyncBatch(events=(), checkpoint=dict(checkpoint), warnings=("Composio trigger delivery is prospective; historical backfill must be implemented by a provider-specific connector or an explicit Composio read tool.",))
+
+    def sync(self, connection: Connection, checkpoint: Mapping[str, Any], context: ConnectorContext) -> SyncBatch:
+        context.store.ack_webhooks(int(value) for value in checkpoint.get("delivered_webhook_ids", []))
+        pending = context.store.pending_webhooks(connection.connection_id)
+        events: list[CaptureEvent] = []
+        delivered: list[int] = []
+        allowed_toolkits = set(str(value).lower() for value in connection.settings.get("toolkits", []))
+        for envelope in pending:
+            delivered.append(int(envelope["webhook_id"]))
+            body = envelope["body"]
+            if not isinstance(body, Mapping):
+                continue
+            payload = body.get("data") if isinstance(body.get("data"), Mapping) else body.get("payload") if isinstance(body.get("payload"), Mapping) else body
+            trigger = str(body.get("trigger_name") or body.get("trigger") or body.get("type") or "trigger")
+            payload_toolkit = payload.get("toolkit") if isinstance(payload, Mapping) else None
+            toolkit = str(body.get("toolkit") or body.get("app") or payload_toolkit or "").lower()
+            if allowed_toolkits and toolkit not in allowed_toolkits:
+                continue
+            event_id = str(body.get("id") or body.get("event_id") or content_digest(body))
+            actor_value = payload.get("actor") if isinstance(payload, Mapping) else None
+            actors = ()
+            if isinstance(actor_value, Mapping) and actor_value.get("id"):
+                actors = (Actor(provider_ref=f"composio:{actor_value['id']}", display_name=str(actor_value.get("name") or actor_value["id"])),)
+            text = ""
+            if isinstance(payload, Mapping):
+                for key in ("text", "body", "summary", "title", "subject"):
+                    if payload.get(key):
+                        text = str(payload[key])
+                        break
+            events.append(
+                CaptureEvent.create(
+                    connector_id=self.manifest.id,
+                    connection_id=connection.connection_id,
+                    source_record_id=event_id,
+                    source_revision=content_digest(body),
+                    source_thread_id=str(body.get("connection_id") or body.get("connected_account_id") or trigger),
+                    kind=f"composio.{trigger}",
+                    occurred_at=str(body.get("timestamp") or body.get("created_at") or envelope["received_at"]),
+                    actors=actors,
+                    text=text or f"Composio trigger: {trigger}",
+                    raw=body,
+                    metadata={"trigger": trigger, "toolkit": toolkit},
+                )
+            )
+        return SyncBatch(events=tuple(events), checkpoint={"delivered_webhook_ids": delivered, "last_received_at": pending[-1]["received_at"] if pending else checkpoint.get("last_received_at")})
+
+    def health(self, connection: Connection | None, context: ConnectorContext) -> HealthReport:
+        if connection is None:
             return HealthReport(state="disconnected")
-        if self.manifest.id.endswith(".example"):
-            return HealthReport(state="healthy")
-        return HealthReport(
-            state="auth_required",
-            error="credentials not configured; live sync is not faked",
-        )
-
-    def connect(self, request: dict[str, Any]) -> dict[str, Any]:
-        if self.manifest.id.endswith(".example"):
-            self._connected = True
-            return {"ok": True, "connection_id": "con_example", "custody": "local"}
-        secret = (
-            request.get("secret_ref")
-            or request.get("path")
-            or request.get("export_path")
-            or request.get("socket")
-        )
-        if not secret:
-            return {
-                "ok": False,
-                "error": "auth_required",
-                "message": "No credentials supplied. Capture plugins do not invent sessions.",
-            }
-        self._connected = True
-        self._secret_ref = str(secret)
-        return {
-            "ok": True,
-            "connection_id": "con_pending",
-            "custody": self.manifest.custody,
-            "live_sync": False,
-            "note": "Credential handle accepted. Live provider client is not claimed until implemented.",
-        }
-
-    def backfill(self, request: dict[str, Any]) -> list[CaptureEvent]:
-        if self.manifest.id.endswith(".example"):
-            return [self._fixture_event()]
-        return []
-
-    def sync(self, request: dict[str, Any]) -> list[CaptureEvent]:
-        return []
-
-    def revoke(self) -> dict[str, Any]:
-        self._connected = False
-        self._secret_ref = None
-        return {"ok": True, "credentials_deleted": True, "evidence_untouched": True}
-
-    def purge(self) -> dict[str, Any]:
-        return {"ok": True, "raw_deleted": True, "canon_untouched": True}
-
-    def test_fixture(self) -> dict[str, Any]:
-        ev = self._fixture_event()
-        return {"ok": True, "events": 1, "event_id": ev.event_id, "kind": ev.kind}
-
-    def _fixture_event(self) -> CaptureEvent:
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        text = "synthetic fixture; not personal data (composio)"
-        return CaptureEvent(
-            event_id="evt_" + uuid4().hex[:12],
-            connector_id=self.manifest.id,
-            source_record_id="fix_1",
-            kind="fixture.created",
-            occurred_at=now,
-            observed_at=now,
-            text=text,
-            content_hash=sha256(text.encode()).hexdigest(),
-            metadata={"connector": "composio", "synthetic": True},
-        )
+        return HealthReport(state="healthy", details={"pending_webhooks": len(context.store.pending_webhooks(connection.connection_id, limit=1000)), "custody": "third_party"})
