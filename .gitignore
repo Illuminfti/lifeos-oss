@@ -1,8 +1,25 @@
-.venv/
 __pycache__/
-*.pyc
-.lifeos/state.sqlite
-brain/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+build/
 dist/
 *.egg-info/
-.pytest_cache/
+
+# Local LifeOS state, brains, credentials, and provider sessions
+brain/
+.lifeos/
+*.session
+*.session-journal
+.env
+.env.*
+secrets.json
+credentials.json
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
