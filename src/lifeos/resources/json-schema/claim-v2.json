@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lifeos://schemas/claim-v2.json",
+  "title": "LifeOS Canonical Claim v2",
+  "type": "object",
+  "required": [
+    "id", "predicate", "object", "polarity", "modality", "qualifiers",
+    "status", "rank", "confidence", "evidence", "recorded_at", "review"
+  ],
+  "properties": {
+    "id": {"type": "string", "pattern": "^clm_"},
+    "predicate": {"type": "string", "minLength": 1},
+    "object": {
+      "type": "object",
+      "oneOf": [
+        {"required": ["ref"], "properties": {"ref": {"type": "string"}}},
+        {"required": ["value", "datatype"], "properties": {"datatype": {"type": "string"}}},
+        {"required": ["state"], "properties": {"state": {"enum": ["unknown", "no_value"]}}}
+      ]
+    },
+    "polarity": {"enum": ["positive", "negative"]},
+    "modality": {"enum": ["actual", "scheduled", "desired", "hypothetical", "conditional", "disputed", "attributed", "inferred"]},
+    "qualifiers": {"type": "object"},
+    "status": {"enum": ["active", "historical", "disputed", "superseded", "retracted", "deprecated"]},
+    "rank": {"enum": ["preferred", "normal", "deprecated"]},
+    "confidence": {
+      "type": "object",
+      "required": ["extraction", "identity", "evidence", "temporal", "modality"],
+      "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}
+    },
+    "evidence": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "recorded_at": {"type": "string"},
+    "review": {"type": "object", "required": ["state"]}
+  },
+  "additionalProperties": true
+}

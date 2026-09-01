@@ -1,0 +1,332 @@
+schema: lifeos.predicates/v2
+version: 2.0.0
+predicates:
+  name:
+    domain: ['*']
+    range: [string]
+    object_kind: literal
+    temporal: true
+    cardinality: many
+  description:
+    domain: ['*']
+    range: [string]
+    object_kind: literal
+    temporal: true
+    cardinality: many
+  status:
+    domain: [project, open_loop, organization, collective, asset]
+    range: [string]
+    object_kind: literal
+    temporal: true
+    cardinality: one
+    contradiction_policy: exclusive_overlap
+  works_at:
+    domain: [person]
+    range: [organization]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: has_worker
+    allowed_qualifiers: [role, valid_from, valid_to]
+  member_of:
+    domain: [person, organization]
+    range: [organization, collective]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: has_member
+  leads:
+    domain: [person, organization]
+    range: [organization, collective, project]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: led_by
+  owns:
+    domain: [person, organization, collective]
+    range: [organization, asset, project]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: owned_by
+  advises:
+    domain: [person, organization]
+    range: [person, organization, project]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: advised_by
+  partner_of:
+    domain: [person, organization]
+    range: [person, organization]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    symmetric: true
+  customer_of:
+    domain: [person, organization]
+    range: [organization]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: has_customer
+  parent_of:
+    domain: [person]
+    range: [person]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: child_of
+  guardian_of:
+    domain: [person]
+    range: [person]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: guarded_by
+  spouse_of:
+    domain: [person]
+    range: [person]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    symmetric: true
+  sibling_of:
+    domain: [person]
+    range: [person]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    symmetric: true
+  household_member_of:
+    domain: [person]
+    range: [collective]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: has_household_member
+  knows:
+    domain: [person]
+    range: [person]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    symmetric: true
+  participates_in:
+    domain: [person, organization, collective]
+    range: [project, event, collective]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: has_participant
+  responsible_for:
+    domain: [person, organization, collective]
+    range: [project, open_loop, life_function, asset]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: responsibility_of
+  belongs_to_function:
+    domain: [project, open_loop, asset, event, decision]
+    range: [life_function]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: contains_item
+  depends_on:
+    domain: [project, open_loop, decision, organization]
+    range: [person, organization, project, open_loop, asset, event]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: dependency_of
+  blocks:
+    domain: [person, organization, project, open_loop, asset, event]
+    range: [project, open_loop]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: blocked_by
+  contributes_to:
+    domain: [person, organization, collective, project, asset, concept]
+    range: [project, life_function, concept, collective]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: receives_contribution_from
+  serves_goal:
+    domain: [project, open_loop, asset, decision]
+    range: [concept, life_function, project]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+  about:
+    domain: [concept, project, event, decision, open_loop, asset]
+    range: [person, organization, collective, concept, project, life_function, asset, place]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+  supports:
+    domain: [person, organization, collective, concept]
+    range: [concept, collective, project]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: supported_by
+  opposes:
+    domain: [person, organization, collective, concept]
+    range: [concept, collective, project]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+  influenced_by:
+    domain: [person, concept, project, collective]
+    range: [person, organization, collective, concept, event]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: influences
+  participates_in_movement:
+    domain: [person, organization, collective]
+    range: [collective]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+  owns_asset:
+    domain: [person, organization, collective]
+    range: [asset]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: asset_owned_by
+  controls_asset:
+    domain: [person, organization, collective]
+    range: [asset]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: asset_controlled_by
+  uses_asset:
+    domain: [person, organization, collective, project]
+    range: [asset]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: used_by
+  maintains_asset:
+    domain: [person, organization, collective]
+    range: [asset]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: maintained_by
+  located_at:
+    domain: [person, organization, collective, asset, event, project]
+    range: [place]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: location_of
+  participant_in:
+    domain: [person, organization, collective]
+    range: [event]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: has_participant
+  occurred_at:
+    domain: [event, decision]
+    range: [datetime]
+    object_kind: literal
+    temporal: false
+    cardinality: one
+    contradiction_policy: exclusive_overlap
+  resulted_in:
+    domain: [event, decision]
+    range: [event, project, open_loop, concept, asset]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+    inverse: result_of
+  satisfies:
+    domain: [event, decision, open_loop]
+    range: [open_loop, project, life_function]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+  supersedes:
+    domain: [decision, event, project, open_loop, concept]
+    range: [decision, event, project, open_loop, concept]
+    object_kind: entity_ref
+    temporal: false
+    cardinality: many
+    inverse: superseded_by
+  owed_by:
+    domain: [open_loop]
+    range: [person, organization, collective]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+  owed_to:
+    domain: [open_loop]
+    range: [person, organization, collective]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+  waiting_on:
+    domain: [open_loop, project]
+    range: [person, organization, collective, open_loop, event, asset]
+    object_kind: entity_ref
+    temporal: true
+    cardinality: many
+  due_at:
+    domain: [open_loop, project]
+    range: [datetime]
+    object_kind: literal
+    temporal: false
+    cardinality: one
+    contradiction_policy: exclusive_overlap
+  target_date:
+    domain: [project, decision]
+    range: [date]
+    object_kind: literal
+    temporal: false
+    cardinality: one
+    contradiction_policy: exclusive_overlap
+  intended_outcome:
+    domain: [decision, project]
+    range: [string]
+    object_kind: literal
+    temporal: true
+    cardinality: many
+  observed_outcome:
+    domain: [decision, project, event]
+    range: [string]
+    object_kind: literal
+    temporal: true
+    cardinality: many
+  importance:
+    domain: ['*']
+    range: [number]
+    object_kind: literal
+    temporal: true
+    cardinality: one
+    contradiction_policy: exclusive_overlap
+  desired_cadence:
+    domain: [life_function]
+    range: [string]
+    object_kind: literal
+    temporal: true
+    cardinality: one
+  minimum_meaningful_actions:
+    domain: [life_function]
+    range: [number]
+    object_kind: literal
+    temporal: true
+    cardinality: one
+  neglect_window_days:
+    domain: [life_function]
+    range: [number]
+    object_kind: literal
+    temporal: true
+    cardinality: one

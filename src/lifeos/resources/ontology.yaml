@@ -1,0 +1,47 @@
+schema: lifeos.ontology/v2
+version: 2.0.0
+types:
+  person:
+    root: subject
+    id_prefix: per
+    kinds: [individual]
+  organization:
+    root: subject
+    id_prefix: org
+    kinds: [business, nonprofit, company, institution, protocol_operator, government, school]
+  collective:
+    root: subject
+    id_prefix: col
+    kinds: [movement, community, household, working_group, team]
+  concept:
+    root: subject
+    id_prefix: con
+    kinds: [idea, thesis, hypothesis, principle, topic]
+  project:
+    root: subject
+    id_prefix: prj
+    kinds: [project, campaign, initiative, experiment, workstream]
+  life_function:
+    root: subject
+    id_prefix: fun
+    kinds: [health, family, work, home, finances, learning, relationships, recreation, custom]
+  asset:
+    root: subject
+    id_prefix: ast
+    kinds: [physical, financial, digital, account, intellectual_property, tool, media, credential]
+  place:
+    root: subject
+    id_prefix: plc
+    kinds: [home, venue, city, office, destination, region]
+  event:
+    root: occurrence
+    id_prefix: evt
+    kinds: [meeting, interaction, journey, health_episode, milestone, transaction, activity]
+  decision:
+    root: occurrence
+    id_prefix: dec
+    kinds: [reversible, irreversible, provisional, superseding]
+  open_loop:
+    root: commitment
+    id_prefix: lop
+    kinds: [task, promise, request, waiting_on, unanswered_question, dependency, follow_up]
