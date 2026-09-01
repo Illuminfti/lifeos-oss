@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifeos.dev/schemas/capture-event.v1.json",
+  "title": "LifeOS CaptureEvent v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "event_id",
+    "connector_id",
+    "connection_id",
+    "source_record_id",
+    "source_revision",
+    "kind",
+    "occurred_at",
+    "observed_at",
+    "text",
+    "actors",
+    "attachments",
+    "deleted",
+    "visibility",
+    "content_hash",
+    "metadata"
+  ],
+  "properties": {
+    "schema": {"const": "lifeos.capture-event/v1"},
+    "event_id": {"type": "string", "pattern": "^evt_[a-f0-9]+$"},
+    "connector_id": {"type": "string", "pattern": "^org\\.[a-z0-9.-]+$"},
+    "connection_id": {"type": "string", "minLength": 1},
+    "source_record_id": {"type": "string", "minLength": 1},
+    "source_revision": {"type": "string"},
+    "source_thread_id": {"type": ["string", "null"]},
+    "kind": {"type": "string", "minLength": 1},
+    "occurred_at": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "minLength": 1},
+    "text": {"type": "string"},
+    "actors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["display_name"],
+        "properties": {
+          "display_name": {"type": "string"},
+          "provider_ref": {"type": ["string", "null"]},
+          "role": {"type": ["string", "null"]},
+          "canonical_hint": {"type": ["string", "null"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["blob_ref"],
+        "properties": {
+          "blob_ref": {"type": "string", "minLength": 1},
+          "mime_type": {"type": ["string", "null"]},
+          "size": {"type": ["integer", "null"], "minimum": 0},
+          "name": {"type": ["string", "null"]},
+          "source_url": {"type": ["string", "null"]},
+          "metadata": {"type": "object"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "deleted": {"type": "boolean"},
+    "visibility": {"enum": ["private", "restricted", "public"]},
+    "content_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "raw_blob_ref": {"type": ["string", "null"]},
+    "metadata": {"type": "object"}
+  },
+  "additionalProperties": false
+}
