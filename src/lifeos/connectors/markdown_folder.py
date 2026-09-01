@@ -2,99 +2,108 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from hashlib import sha256
-from typing import Any
-from uuid import uuid4
+from pathlib import Path
 
-from lifeos.contracts import CaptureEvent, ConnectorManifest, HealthReport
+from lifeos.connectors.base import BasePlugin, ConnectorContext
+from lifeos.contracts import CaptureEvent, ConnectionReceipt, ConnectorManifest, HealthReport, SyncBatch
+from lifeos.errors import ConfigurationError
 
 
-class Plugin:
-    """Markdown folder capture plugin. Outbound send is out of scope."""
-
-    def __init__(self) -> None:
+class Plugin(BasePlugin):
+    def __init__(self, context: ConnectorContext | None = None):
+        super().__init__(context)
         self.manifest = ConnectorManifest(
             id="org.lifeos.markdown-folder",
             display_name="Markdown folder",
-            source_classes=['note', 'page'],
-            capabilities=['backfill', 'incremental_sync', 'purge'],
-            auth_modes=['path'],
-            custody="local",
-            outbound_actions=False,
-            notes="User-selected Markdown directory as a source, not as a second canon.",
+            source_classes=["document", "file"],
+            capabilities=["backfill", "incremental_sync", "deletions", "revoke", "purge"],
+            auth_modes=["local_path"],
+            notes="Read-only recursive Markdown importer. The selected canonical brain is rejected to prevent ingest loops.",
         )
-        self._connected = False
-        self._secret_ref: str | None = None
 
-    def describe(self) -> ConnectorManifest:
-        return self.manifest
+    def _path(self, request):
+        config = self._public_config(request)
+        raw = request.get("path") or config.get("path")
+        if not raw:
+            raise ConfigurationError("config.path is required")
+        path = Path(str(raw)).expanduser().resolve()
+        if not path.is_dir():
+            raise ConfigurationError(f"Markdown folder does not exist: {path}")
+        if self.context.brain and (
+            path == self.context.brain or path in self.context.brain.parents or self.context.brain in path.parents
+        ):
+            raise ConfigurationError("source folder may not contain or equal the LifeOS brain")
+        return path
 
-    def health(self) -> HealthReport:
-        if not self._connected:
+    def connect(self, request):
+        try:
+            path = self._path(request)
+        except Exception as exc:
+            return ConnectionReceipt(ok=False, state="auth_required", error="configuration_required", message=str(exc))
+        return ConnectionReceipt(
+            ok=True,
+            connection_id=self._connection_id(request, "markdown"),
+            state="healthy",
+            public_config={"path": str(path)},
+            provider_identity={"path": str(path)},
+        )
+
+    def backfill(self, request):
+        return self._scan(request, False)
+
+    def sync(self, request):
+        return self._scan(request, True)
+
+    def _scan(self, request, incremental):
+        root = self._path(request)
+        connection = self._connection_id(request, "markdown")
+        old = dict((request.get("checkpoint") or {}).get("files") or {})
+        current = {}
+        events = []
+        for path in sorted(root.rglob("*.md")):
+            if not path.is_file() or any(part.startswith(".") for part in path.relative_to(root).parts):
+                continue
+            raw = path.read_bytes()
+            digest = sha256(raw).hexdigest()
+            relative = path.relative_to(root).as_posix()
+            current[relative] = digest
+            if incremental and old.get(relative) == digest:
+                continue
+            stat = path.stat()
+            events.append(
+                CaptureEvent.build(
+                    connector_id=self.manifest.id,
+                    connection_id=connection,
+                    source_record_id=relative,
+                    source_revision=digest,
+                    kind="document.updated" if relative in old else "document.created",
+                    occurred_at=datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat().replace("+00:00", "Z"),
+                    text=raw.decode("utf-8", errors="replace"),
+                    metadata={"relative_path": relative, "size": stat.st_size},
+                )
+            )
+        if incremental:
+            for relative, digest in sorted(old.items()):
+                if relative not in current:
+                    events.append(
+                        CaptureEvent.build(
+                            connector_id=self.manifest.id,
+                            connection_id=connection,
+                            source_record_id=relative,
+                            source_revision="deleted:" + digest,
+                            kind="document.deleted",
+                            occurred_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                            deleted=True,
+                            metadata={"relative_path": relative},
+                        )
+                    )
+        return SyncBatch(events=events, checkpoint={"files": current}, complete=True)
+
+    def health(self, request=None):
+        if not request:
             return HealthReport(state="disconnected")
-        if self.manifest.id.endswith(".example"):
-            return HealthReport(state="healthy")
-        return HealthReport(
-            state="auth_required",
-            error="credentials not configured; live sync is not faked",
-        )
-
-    def connect(self, request: dict[str, Any]) -> dict[str, Any]:
-        if self.manifest.id.endswith(".example"):
-            self._connected = True
-            return {"ok": True, "connection_id": "con_example", "custody": "local"}
-        secret = (
-            request.get("secret_ref")
-            or request.get("path")
-            or request.get("export_path")
-            or request.get("socket")
-        )
-        if not secret:
-            return {
-                "ok": False,
-                "error": "auth_required",
-                "message": "No credentials supplied. Capture plugins do not invent sessions.",
-            }
-        self._connected = True
-        self._secret_ref = str(secret)
-        return {
-            "ok": True,
-            "connection_id": "con_pending",
-            "custody": self.manifest.custody,
-            "live_sync": False,
-            "note": "Credential handle accepted. Live provider client is not claimed until implemented.",
-        }
-
-    def backfill(self, request: dict[str, Any]) -> list[CaptureEvent]:
-        if self.manifest.id.endswith(".example"):
-            return [self._fixture_event()]
-        return []
-
-    def sync(self, request: dict[str, Any]) -> list[CaptureEvent]:
-        return []
-
-    def revoke(self) -> dict[str, Any]:
-        self._connected = False
-        self._secret_ref = None
-        return {"ok": True, "credentials_deleted": True, "evidence_untouched": True}
-
-    def purge(self) -> dict[str, Any]:
-        return {"ok": True, "raw_deleted": True, "canon_untouched": True}
-
-    def test_fixture(self) -> dict[str, Any]:
-        ev = self._fixture_event()
-        return {"ok": True, "events": 1, "event_id": ev.event_id, "kind": ev.kind}
-
-    def _fixture_event(self) -> CaptureEvent:
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        text = "synthetic fixture; not personal data (markdown-folder)"
-        return CaptureEvent(
-            event_id="evt_" + uuid4().hex[:12],
-            connector_id=self.manifest.id,
-            source_record_id="fix_1",
-            kind="fixture.created",
-            occurred_at=now,
-            observed_at=now,
-            text=text,
-            content_hash=sha256(text.encode()).hexdigest(),
-            metadata={"connector": "markdown-folder", "synthetic": True},
-        )
+        try:
+            path = self._path(request)
+            return HealthReport(state="healthy", details={"path": str(path)})
+        except Exception as exc:
+            return HealthReport(state="failed", error=str(exc))
