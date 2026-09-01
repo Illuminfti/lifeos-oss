@@ -1,25 +1,46 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "lifeos"
-version = "0.1.0"
+version = "0.2.0a1"
 description = "Open-source capture-to-canon world model"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [{name = "LifeOS contributors"}]
+keywords = ["personal knowledge", "agents", "mcp", "markdown", "world model"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed",
+]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["build>=1.2", "pytest>=8.0"]
+telegram = ["telethon>=1.36,<2"]
+pggraph = ["psycopg[binary]>=3.2,<4"]
+all = ["telethon>=1.36,<2", "psycopg[binary]>=3.2,<4"]
 
 [project.scripts]
 lifeos = "lifeos.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Illuminfti/lifeos-oss"
+Issues = "https://github.com/Illuminfti/lifeos-oss/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["lifeos"]
+branch = true
