@@ -1,12 +1,58 @@
 name: ci
-on: [push, pull_request]
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - run: pip install -e . pytest
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e '.[dev]'
+      - run: python -m compileall -q src tests
       - run: python -m pytest -q
+      - run: python -m pip check
+      - run: python -m build
+      - name: Reject private paths and credential material
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          forbidden_text = [
+              "/home/ubuntu/",
+              "127.0.0.1:4788",
+              "BEGIN PRIVATE KEY",
+              "BEGIN OPENSSH PRIVATE KEY",
+          ]
+          forbidden_suffixes = {".session", ".pem", ".key", ".p12", ".pfx"}
+          ignored = {".git", ".venv", "build", "dist"}
+          failures = []
+          for path in Path(".").rglob("*"):
+              if not path.is_file() or any(part in ignored for part in path.parts):
+                  continue
+              if path.suffix.lower() in forbidden_suffixes:
+                  failures.append(f"forbidden file type: {path}")
+                  continue
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+              for needle in forbidden_text:
+                  if needle in text:
+                      failures.append(f"forbidden text {needle!r}: {path}")
+          if failures:
+              raise SystemExit("\n".join(failures))
+          PY
