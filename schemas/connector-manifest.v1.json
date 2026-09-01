@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifeos.dev/schemas/connector-manifest.v1.json",
+  "title": "LifeOS Connector Manifest v1",
+  "type": "object",
+  "required": [
+    "protocol",
+    "id",
+    "version",
+    "display_name",
+    "source_classes",
+    "capabilities",
+    "auth_modes",
+    "custody",
+    "outbound_actions"
+  ],
+  "properties": {
+    "protocol": {"const": "lifeos.connector/v1"},
+    "id": {"type": "string", "pattern": "^org\\.[a-z0-9.-]+$"},
+    "version": {"type": "string", "minLength": 1},
+    "display_name": {"type": "string", "minLength": 1},
+    "source_classes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "backfill",
+          "incremental_sync",
+          "webhooks",
+          "attachments",
+          "deletions",
+          "revoke",
+          "purge"
+        ]
+      }
+    },
+    "auth_modes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "custody": {"enum": ["local", "third_party"]},
+    "outbound_actions": {"const": false},
+    "notes": {"type": "string"},
+    "config_schema": {"type": "object"}
+  },
+  "additionalProperties": false
+}
