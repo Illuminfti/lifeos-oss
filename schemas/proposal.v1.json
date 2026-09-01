@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifeos.dev/schemas/proposal.v1.json",
+  "title": "LifeOS Auto-wiki Proposal v1",
+  "type": "object",
+  "required": [
+    "proposal_id",
+    "proposal_type",
+    "status",
+    "title",
+    "target_path",
+    "target_id",
+    "base_revision",
+    "evidence",
+    "proposed",
+    "created_at",
+    "updated_at",
+    "confidence",
+    "conflicts",
+    "interaction_count",
+    "source_classes"
+  ],
+  "properties": {
+    "proposal_id": {"type": "string", "pattern": "^prop_[a-f0-9]+$"},
+    "proposal_type": {"enum": ["entity_update", "fact_update", "relation_update", "deletion"]},
+    "status": {"enum": ["awaiting_review", "promoted", "rejected", "conflict", "deferred"]},
+    "title": {"type": "string", "minLength": 1},
+    "target_path": {"type": "string", "pattern": "^(03-entities|04-work|05-knowledge|06-execution)/"},
+    "target_id": {"type": "string", "minLength": 1},
+    "base_revision": {"type": "string", "minLength": 1},
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["event_id", "connector_id", "occurred_at", "content_hash"],
+        "properties": {
+          "event_id": {"type": "string"},
+          "connector_id": {"type": "string"},
+          "connection_id": {"type": "string"},
+          "occurred_at": {"type": "string"},
+          "content_hash": {"type": "string"},
+          "raw_path": {"type": "string"},
+          "excerpt": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "proposed": {"type": "object"},
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"},
+    "model": {"type": "object"},
+    "confidence": {"enum": ["low", "medium", "high", "unknown"]},
+    "conflicts": {"type": "array", "items": {"type": "object"}},
+    "interaction_count": {"type": "integer", "minimum": 1},
+    "source_classes": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}
