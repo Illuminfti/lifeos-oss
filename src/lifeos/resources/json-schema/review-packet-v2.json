@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lifeos://schemas/review-packet-v2.json",
+  "title": "LifeOS Review Packet v2",
+  "type": "object",
+  "required": ["packet_id", "packet_kind", "priority", "state", "operations", "created_at", "updated_at"],
+  "properties": {
+    "packet_id": {"type": "string", "pattern": "^pkt_"},
+    "packet_kind": {"enum": ["urgent_commitment", "conflict", "identity_spawn", "routine_delta"]},
+    "subject_id": {"type": ["string", "null"]},
+    "priority": {"type": "number"},
+    "state": {"enum": ["open", "accepted", "partially_accepted", "rejected", "snoozed", "expired"]},
+    "operations": {"type": "array", "items": {"type": "object"}},
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"}
+  },
+  "additionalProperties": true
+}

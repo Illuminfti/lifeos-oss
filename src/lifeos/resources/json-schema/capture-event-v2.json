@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lifeos://schemas/capture-event-v2.json",
+  "title": "LifeOS Capture Event v2",
+  "type": "object",
+  "required": [
+    "schema", "event_id", "brain_id", "connector_id", "connection_id",
+    "source_record_id", "source_revision", "kind", "observed_at", "content_hash"
+  ],
+  "properties": {
+    "schema": {"const": "lifeos.capture-event/v2"},
+    "event_id": {"type": "string", "minLength": 1},
+    "brain_id": {"type": "string", "minLength": 1},
+    "connector_id": {"type": "string", "minLength": 1},
+    "connection_id": {"type": "string", "minLength": 1},
+    "source_record_id": {"type": "string", "minLength": 1},
+    "source_revision": {"type": "string", "minLength": 1},
+    "kind": {"type": "string", "minLength": 1},
+    "occurred_at": {"type": "string"},
+    "observed_at": {"type": "string", "minLength": 1},
+    "supersedes_event_id": {"type": ["string", "null"]},
+    "correlation_id": {"type": ["string", "null"]},
+    "text": {"type": "string"},
+    "deleted": {"type": "boolean"},
+    "content_hash": {"type": "string", "minLength": 1},
+    "raw_ref": {"type": ["string", "null"]},
+    "visibility": {"enum": ["private", "shared", "public"]},
+    "sensitivity": {"type": "string"},
+    "actors": {"type": "array", "items": {"type": "object"}},
+    "conversation": {"type": ["object", "null"]},
+    "attachments": {"type": "array", "items": {"type": "object"}},
+    "links": {"type": "array", "items": {"type": "object"}},
+    "metadata": {"type": "object"}
+  },
+  "additionalProperties": true
+}

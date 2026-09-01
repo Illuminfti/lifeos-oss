@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lifeos://schemas/canon-page-v2.json",
+  "title": "LifeOS Canon Page v2",
+  "type": "object",
+  "required": [
+    "schema",
+    "ontology_version",
+    "id",
+    "type",
+    "title",
+    "status",
+    "sensitivity",
+    "revision",
+    "created_at",
+    "updated_at",
+    "claims"
+  ],
+  "properties": {
+    "schema": {"const": "lifeos.canon-page/v2"},
+    "ontology_version": {"type": "string"},
+    "id": {"type": "string", "minLength": 1},
+    "type": {"type": "string", "minLength": 1},
+    "kind": {"type": ["string", "null"]},
+    "title": {"type": "string", "minLength": 1},
+    "status": {"enum": ["active", "inactive", "archived", "merged"]},
+    "aliases": {"type": "array", "items": {"type": "string"}},
+    "sensitivity": {"type": "string"},
+    "importance": {"type": "number", "minimum": 0, "maximum": 1},
+    "revision": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"},
+    "claims": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}
