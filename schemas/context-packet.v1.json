@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifeos.dev/schemas/context-packet.v1.json",
+  "title": "LifeOS Turn Context Packet v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "packet_id",
+    "purpose",
+    "as_of",
+    "current_facts",
+    "recent_changes",
+    "open_loops",
+    "constraints",
+    "evidence",
+    "coverage",
+    "digest",
+    "status"
+  ],
+  "properties": {
+    "schema": {"const": "lifeos.turn-context/v1"},
+    "packet_id": {"type": "string", "pattern": "^pkt_[a-f0-9]+$"},
+    "purpose": {"type": "string", "minLength": 1},
+    "as_of": {"type": "string", "minLength": 1},
+    "current_facts": {"type": "array", "items": {"type": "object"}},
+    "recent_changes": {"type": "array", "items": {"type": "object"}},
+    "open_loops": {"type": "array", "items": {"type": "object"}},
+    "constraints": {"type": "array", "items": {"type": "object"}},
+    "evidence": {"type": "array", "items": {"type": "object"}},
+    "coverage": {
+      "type": "object",
+      "required": ["current_sources", "stale_sources", "denied_sources", "failed_sources"],
+      "properties": {
+        "current_sources": {"type": "array", "items": {"type": "string"}},
+        "stale_sources": {"type": "array", "items": {"type": "string"}},
+        "denied_sources": {"type": "array", "items": {"type": "string"}},
+        "failed_sources": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "status": {"enum": ["ok", "partial", "not_modified"]}
+  },
+  "additionalProperties": false
+}
